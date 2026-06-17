@@ -1,0 +1,45 @@
+CREATE DATABASE IF NOT EXISTS pipe_inspection
+  DEFAULT CHARACTER SET utf8mb4
+  DEFAULT COLLATE utf8mb4_unicode_ci;
+
+USE pipe_inspection;
+
+CREATE TABLE IF NOT EXISTS pipe_nodes (
+  id VARCHAR(50) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  node_type VARCHAR(20) NOT NULL DEFAULT 'junction',
+  x FLOAT NOT NULL,
+  y FLOAT NOT NULL,
+  depth FLOAT DEFAULT 0.0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_type (node_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS pipe_connections (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  from_node_id VARCHAR(50) NOT NULL,
+  to_node_id VARCHAR(50) NOT NULL,
+  distance FLOAT NOT NULL DEFAULT 10.0,
+  pipe_diameter FLOAT DEFAULT 0.5,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_from (from_node_id),
+  INDEX idx_to (to_node_id),
+  FOREIGN KEY (from_node_id) REFERENCES pipe_nodes(id) ON DELETE CASCADE,
+  FOREIGN KEY (to_node_id) REFERENCES pipe_nodes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS gas_readings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  node_id VARCHAR(50) NOT NULL,
+  h2s_concentration FLOAT NOT NULL DEFAULT 0.0,
+  ch4_concentration FLOAT NOT NULL DEFAULT 0.0,
+  temperature FLOAT DEFAULT 25.0,
+  humidity FLOAT DEFAULT 60.0,
+  robot_id VARCHAR(50),
+  recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_node (node_id),
+  INDEX idx_recorded_at (recorded_at),
+  FOREIGN KEY (node_id) REFERENCES pipe_nodes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
