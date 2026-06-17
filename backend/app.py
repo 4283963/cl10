@@ -307,8 +307,30 @@ def register_routes(app):
         if not start_id or not end_id:
             return jsonify({'success': False, 'error': '请提供 start_id 和 end_id'}), 400
 
-        result = dijkstra_safe_route(start_id, end_id)
-        return jsonify(result)
+        try:
+            result = dijkstra_safe_route(start_id, end_id)
+            if result is None:
+                result = {
+                    'success': False,
+                    'error': '路径规划算法返回空值，请检查管网数据是否完整'
+                }
+            if not isinstance(result, dict):
+                result = {
+                    'success': False,
+                    'error': f'路径规划返回异常数据格式: {type(result).__name__}'
+                }
+            if 'success' not in result:
+                result['success'] = False
+                if 'error' not in result:
+                    result['error'] = '路径规划返回结果格式不完整'
+            return jsonify(result)
+        except Exception as e:
+            db.session.rollback()
+            app.logger.exception(f'路径规划异常: {e}')
+            return jsonify({
+                'success': False,
+                'error': f'路径规划服务异常: {str(e)}。请稍后重试或联系运维。'
+            }), 500
 
     @app.route('/api/thresholds', methods=['GET'])
     def get_thresholds():

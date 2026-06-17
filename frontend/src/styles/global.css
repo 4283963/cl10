@@ -487,8 +487,10 @@ html, body, #root {
   padding: 10px 12px;
   color: #ef5350;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.7;
   margin-top: 10px;
+  white-space: pre-line;
+  word-break: break-all;
 }
 
 .success-message {

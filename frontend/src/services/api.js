@@ -1,18 +1,61 @@
 const API_BASE = '/api'
 
+function safeResponse(data, fallbackError = '响应数据格式异常') {
+  if (data == null) {
+    return { success: false, error: fallbackError }
+  }
+  if (typeof data !== 'object') {
+    return { success: false, error: `返回数据类型异常: ${typeof data}` }
+  }
+  if (typeof data.success !== 'boolean') {
+    return {
+      success: false,
+      error: data.error || fallbackError,
+      ...data,
+    }
+  }
+  return data
+}
+
 async function request(url, options = {}) {
   const defaultHeaders = {
     'Content-Type': 'application/json',
   }
-  const response = await fetch(`${API_BASE}${url}`, {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...(options.headers || {}),
-    },
-  })
-  const data = await response.json()
-  return data
+  try {
+    const response = await fetch(`${API_BASE}${url}`, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...(options.headers || {}),
+      },
+    })
+
+    let data
+    try {
+      data = await response.json()
+    } catch (parseErr) {
+      const text = await response.text().catch(() => '')
+      return {
+        success: false,
+        error: `服务器返回非 JSON 响应 (HTTP ${response.status})${text ? ': ' + text.slice(0, 200) : ''}`,
+        httpStatus: response.status,
+      }
+    }
+
+    if (!response.ok) {
+      const safe = safeResponse(data, `请求失败 (HTTP ${response.status})`)
+      if (!safe.error) safe.error = `请求失败 (HTTP ${response.status})`
+      safe.httpStatus = response.status
+      return safe
+    }
+
+    return safeResponse(data)
+  } catch (err) {
+    return {
+      success: false,
+      error: `网络请求失败: ${err?.message || String(err)}`,
+    }
+  }
 }
 
 export const api = {

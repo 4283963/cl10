@@ -76,14 +76,35 @@ function App() {
     setRouteData(null)
     try {
       const res = await api.calculateRoute(startId, endId)
+
+      if (!res || typeof res !== 'object') {
+        setError('服务端返回空数据，请稍后重试')
+        return
+      }
+
       if (res.success) {
+        if (!Array.isArray(res.path) || res.path.length === 0) {
+          setError('路线规划结果异常：路径数据为空')
+          return
+        }
         setRouteData(res)
         setSuccessMsg(`路线规划成功！共经过 ${res.path.length} 个节点`)
       } else {
-        setError(res.error || '路线规划失败')
+        let msg = res.error || '路线规划失败'
+        if (Array.isArray(res.blocked_nodes) && res.blocked_nodes.length > 0) {
+          const list = res.blocked_nodes
+            .slice(0, 5)
+            .map(b => `${b.name || b.id}(H₂S=${b.h2s}, CH₄=${b.ch4})`)
+            .join('；')
+          msg += `\n当前超标节点 (共${res.blocked_nodes.length}个): ${list}${res.blocked_nodes.length > 5 ? '...' : ''}`
+        }
+        if (typeof res.safe_node_count === 'number' && typeof res.total_node_count === 'number') {
+          msg += `\n管网安全节点数: ${res.safe_node_count}/${res.total_node_count}`
+        }
+        setError(msg)
       }
     } catch (err) {
-      setError('网络错误：无法获取路线规划')
+      setError(`网络错误：${err?.message || '无法获取路线规划'}`)
     } finally {
       setCalculating(false)
     }
