@@ -6,6 +6,8 @@ from config import Config
 from models import db, PipeNode, PipeConnection, GasReading
 from path_planner import (
     dijkstra_safe_route,
+    dijkstra_compromise_route,
+    calculate_both_routes,
     get_all_nodes_status,
     get_all_connections,
     get_latest_gas_readings
@@ -300,15 +302,21 @@ def register_routes(app):
             data = request.get_json() or {}
             start_id = data.get('start_id')
             end_id = data.get('end_id')
+            include_compromise = data.get('include_compromise', True)
         else:
             start_id = request.args.get('start_id', 'WELL-A')
             end_id = request.args.get('end_id', 'WELL-B')
+            include_compromise = request.args.get('include_compromise', 'true').lower() == 'true'
 
         if not start_id or not end_id:
             return jsonify({'success': False, 'error': '请提供 start_id 和 end_id'}), 400
 
         try:
-            result = dijkstra_safe_route(start_id, end_id)
+            if include_compromise:
+                result = calculate_both_routes(start_id, end_id)
+            else:
+                result = dijkstra_safe_route(start_id, end_id)
+
             if result is None:
                 result = {
                     'success': False,

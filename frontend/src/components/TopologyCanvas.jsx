@@ -12,7 +12,7 @@ const STATUS_COLORS = {
   danger: '#ef5350',
 }
 
-function TopologyCanvas({ nodes, connections, routeData, onNodeSelect, selectedNode, setSelectedNode }) {
+function TopologyCanvas({ nodes, connections, routeData, compromiseRouteData, onNodeSelect, selectedNode, setSelectedNode }) {
   const containerRef = useRef(null)
   const svgRef = useRef(null)
   const [viewport, setViewport] = useState({ scale: 1, offsetX: 0, offsetY: 0 })
@@ -76,6 +76,25 @@ function TopologyCanvas({ nodes, connections, routeData, onNodeSelect, selectedN
     }
     return s
   }, [routeData])
+
+  const compromiseEdgesSet = useMemo(() => {
+    const s = new Set()
+    if (compromiseRouteData && compromiseRouteData.edges) {
+      compromiseRouteData.edges.forEach(e => {
+        s.add(`${e.from}|${e.to}`)
+        s.add(`${e.to}|${e.from}`)
+      })
+    }
+    return s
+  }, [compromiseRouteData])
+
+  const compromiseNodeSet = useMemo(() => {
+    const s = new Set()
+    if (compromiseRouteData && compromiseRouteData.path) {
+      compromiseRouteData.path.forEach(p => s.add(p))
+    }
+    return s
+  }, [compromiseRouteData])
 
   const handleMouseDown = (e) => {
     if (e.target.closest('.node-group')) return
@@ -182,6 +201,13 @@ function TopologyCanvas({ nodes, connections, routeData, onNodeSelect, selectedN
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          <filter id="glow-compromise" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
 
         <rect x="-10000" y="-10000" width="30000" height="30000" fill="url(#bgGrid)" />
@@ -191,7 +217,52 @@ function TopologyCanvas({ nodes, connections, routeData, onNodeSelect, selectedN
             const from = nodeMap[conn.from_node_id]
             const to = nodeMap[conn.to_node_id]
             if (!from || !to) return null
-            const isRoute = routeEdgesSet.has(`${conn.from_node_id}|${conn.to_node_id}`)
+            const key = `${conn.from_node_id}|${conn.to_node_id}`
+            const isCompromise = compromiseEdgesSet.has(key) && !routeEdgesSet.has(key)
+            const isRoute = routeEdgesSet.has(key)
+
+            if (isCompromise) {
+              return (
+                <g key={`compromise-${conn.id}`}>
+                  <line
+                    x1={from.tx}
+                    y1={from.ty}
+                    x2={to.tx}
+                    y2={to.ty}
+                    stroke="#ffb74d"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    opacity="0.25"
+                  />
+                  <line
+                    x1={from.tx}
+                    y1={from.ty}
+                    x2={to.tx}
+                    y2={to.ty}
+                    stroke="#ffa726"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    strokeDasharray="12 8"
+                    filter="url(#glow-compromise)"
+                  >
+                    <animate
+                      attributeName="stroke-dashoffset"
+                      from="0"
+                      to="40"
+                      dur="1.5s"
+                      repeatCount="indefinite"
+                    />
+                    <animate
+                      attributeName="opacity"
+                      values="0.5;1;0.5"
+                      dur="1.2s"
+                      repeatCount="indefinite"
+                    />
+                  </line>
+                </g>
+              )
+            }
+
             return (
               <g key={`conn-${conn.id}`}>
                 <line
@@ -224,6 +295,7 @@ function TopologyCanvas({ nodes, connections, routeData, onNodeSelect, selectedN
             const r = NODE_RADIUS[node.node_type] || 14
             const statusColor = STATUS_COLORS[node.status] || '#506687'
             const isRoute = routeNodeSet.has(node.id)
+            const isCompromise = compromiseNodeSet.has(node.id) && !isRoute
             const isSelected = selectedNode === node.id
             return (
               <g
@@ -250,6 +322,23 @@ function TopologyCanvas({ nodes, connections, routeData, onNodeSelect, selectedN
                       from="0"
                       to="360"
                       dur="6s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                )}
+                {isCompromise && (
+                  <circle
+                    r={r + 6}
+                    fill="none"
+                    stroke="#ffa726"
+                    strokeWidth="2.5"
+                    strokeDasharray="6 4"
+                    opacity="0.9"
+                  >
+                    <animate
+                      attributeName="stroke-opacity"
+                      values="0.4;1;0.4"
+                      dur="1.2s"
                       repeatCount="indefinite"
                     />
                   </circle>
@@ -312,9 +401,9 @@ function TopologyCanvas({ nodes, connections, routeData, onNodeSelect, selectedN
                 <text
                   y={r + 16}
                   textAnchor="middle"
-                  fill={isRoute ? '#ef5350' : '#90a4be'}
+                  fill={isRoute ? '#ef5350' : isCompromise ? '#ffa726' : '#90a4be'}
                   fontSize="11"
-                  fontWeight={isRoute ? '600' : '500'}
+                  fontWeight={isRoute || isCompromise ? '600' : '500'}
                   style={{ pointerEvents: 'none', userSelect: 'none' }}
                 >
                   {node.name}
